@@ -180,6 +180,14 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
             <textarea id="f-justification" placeholder="Describe the request..." style="min-height:140px"></textarea>
           </div>
           <div class="form-group">
+            <label>Procurement Channel</label>
+            <select id="f-channel">
+              <option value="">Select channel...</option>
+              <option value="Purchase Order">Purchase Order</option>
+              <option value="Credit Card">Credit Card</option>
+            </select>
+          </div>
+          <div class="form-group">
             <label>Price Quote (PDF — optional)</label>
             <div class="upload-zone" id="upload-zone" onclick="document.getElementById('f-pdf').click()" ondragover="handleDragOver(event)" ondrop="handleDrop(event)">
               <div id="upload-label" style="display:flex;flex-direction:column;align-items:center;gap:6px">
@@ -423,6 +431,7 @@ function openModal(id) {
     <div class="info-grid">
       <div class="info-item"><div class="lbl">Requester</div><div class="val">${r.requester}</div></div>
       <div class="info-item"><div class="lbl">Submitted</div><div class="val">${r.created}</div></div>
+      ${r.channel ? `<div class="info-item"><div class="lbl">Procurement Channel</div><div class="val">${r.channel}</div></div>` : ''}
       ${r.delivery_date ? `<div class="info-item"><div class="lbl">Expected Delivery</div><div class="val">📦 ${r.delivery_date}</div></div>` : ''}
       <div class="info-item" style="grid-column:1/-1"><div class="lbl">Request Details</div><div class="val" style="font-weight:400;font-size:13px;line-height:1.6">${r.justification || '—'}</div></div>
       ${r.quote_url ? `<div class="info-item" style="grid-column:1/-1"><div class="lbl">Price Quote</div><div class="val"><a href="${r.quote_url}" target="_blank" style="color:#1d4ed8;display:inline-flex;align-items:center;gap:6px;font-size:13px">📄 Open PDF ↗</a></div></div>` : ''}
@@ -568,6 +577,7 @@ function removeRow(btn) {
 
 function clearForm() {
   ['f-requester','f-justification'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-channel').value = '';
   document.getElementById('items-body').innerHTML = `<div class="item-row" style="background:#f9f8f5;border-radius:12px;padding:16px;margin-bottom:12px;border:1px solid #e8e6e0"><div style="display:grid;grid-template-columns:2fr 1fr 1fr 80px;gap:12px;margin-bottom:12px"><div class="form-group"><label style="font-size:12px">Item Name</label><input type="text" placeholder="Item name" class="item-name"></div><div class="form-group"><label style="font-size:12px">PN</label><input type="text" placeholder="Optional" class="item-pn"></div><div class="form-group"><label style="font-size:12px">Manufacturer PN</label><input type="text" placeholder="Mfr PN" class="item-mfr-pn"></div><div class="form-group"><label style="font-size:12px">Qty</label><input type="number" min="1" value="1" class="item-qty"></div></div><div style="display:grid;grid-template-columns:120px 100px 1fr 1fr 1fr 36px;gap:12px;align-items:end"><div class="form-group"><label style="font-size:12px">Price</label><input type="number" min="0" step="0.01" placeholder="0.00" class="item-price"></div><div class="form-group"><label style="font-size:12px">Currency</label><select class="item-currency" style="border:1px solid #d4d0c8;border-radius:9px;padding:11px 10px;font-size:15px;background:#fff;font-family:'Inter',sans-serif;width:100%"><option>$</option><option>€</option><option>£</option><option>₪</option><option>¥</option></select></div><div class="form-group"><label style="font-size:12px">Info</label><input type="text" placeholder="Info..." class="item-tech"></div><div class="form-group"><label style="font-size:12px">Link</label><input type="text" placeholder="https://..." class="item-link"></div><div class="form-group"><label style="font-size:12px">Vendor</label><input type="text" placeholder="Optional" class="item-vendor"></div><button class="btn btn-sm btn-danger" onclick="removeRow(this)" style="margin-bottom:2px">✕</button></div></div>`;
   selectedPdfFile = null;
   document.getElementById('f-pdf').value = '';
@@ -618,6 +628,7 @@ async function submitRequest() {
     justification: document.getElementById('f-justification').value.trim(),
     status: 'Pending',
     items,
+    channel: document.getElementById('f-channel').value,
     quote_url: quoteUrl || null,
     delivery_date: null,
     history: [{ date: dateStr, user: requester, status: 'Pending', note: 'Request submitted' }],
