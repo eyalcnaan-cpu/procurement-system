@@ -451,8 +451,44 @@ function openModal(id) {
     </table>
     </div>
     <div class="action-btns">${actionMap[r.status] || ''}</div>
-    ${historyHtml}`;
+    ${historyHtml}
+    <div style="margin-top:16px;border-top:1px solid #f0ede8;padding-top:14px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:#1a1a1a">Notes</div>
+      <div id="notes-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+        ${(r.notes && r.notes.length) ? r.notes.map(n => `
+          <div style="background:#f9f8f5;border-radius:8px;padding:12px;font-size:13px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <span style="font-weight:600;color:#1a1a1a">${n.user}</span>
+              <span style="color:#aaa;font-size:12px">${n.date}</span>
+            </div>
+            <div style="color:#444;line-height:1.5">${n.text}</div>
+          </div>`).join('') : '<div style="font-size:13px;color:#aaa">No notes yet</div>'}
+      </div>
+      <div style="display:flex;gap:10px;align-items:flex-end">
+        <div style="flex:1">
+          <textarea id="new-note-input" placeholder="Add a note..." style="width:100%;border:1px solid #d4d0c8;border-radius:8px;padding:10px 12px;font-size:14px;font-family:'Inter',sans-serif;resize:none;height:70px"></textarea>
+        </div>
+        <button class="btn btn-primary btn-sm" style="margin-bottom:2px" onclick="addNote('${r.id}')">Add Note</button>
+      </div>
+    </div>`;
   document.getElementById('detail-modal').classList.add('open');
+}
+
+async function addNote(id) {
+  const text = document.getElementById('new-note-input')?.value.trim();
+  if (!text) { showToast('Please enter a note'); return; }
+  const r = allRequests.find(x => x.id === id);
+  if (!r) return;
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-GB') + ' ' + now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const newNote = { user: 'User', date: dateStr, text };
+  const newNotes = [...(r.notes || []), newNote];
+  const { error } = await db.from('requests').update({ notes: newNotes }).eq('id', id);
+  if (error) { showToast('Error saving note'); console.error(error); return; }
+  showToast('Note added');
+  closeModal();
+  await loadRequests();
+  openModal(id);
 }
 
 async function saveDeliveryDate(id) {
