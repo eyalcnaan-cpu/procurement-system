@@ -93,9 +93,15 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
 .empty-state{text-align:center;padding:56px;color:#888;font-size:15px}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:22px}
 .upload-zone{border:2px dashed #d4d0c8;border-radius:12px;padding:28px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;transition:border-color .2s,background .2s;background:#fafaf8}
-.upload-zone:hover{border-color:#aaa;background:#f5f4f0}
-.upload-zone.dragover{border-color:#1a1a1a;background:#f0ede8}
-.upload-zone.has-file{border-color:#86efac;background:#f0fdf4}
+.login-screen{display:none;position:fixed;inset:0;background:#f5f4f0;z-index:999;align-items:center;justify-content:center}
+.login-screen.active{display:flex}
+.login-box{background:#fff;border-radius:16px;border:1px solid #e8e6e0;padding:40px;width:100%;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,0.1)}
+.login-logo{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:600;margin-bottom:8px}
+.login-logo svg{width:26px;height:26px}
+.login-sub{font-size:14px;color:#888;margin-bottom:28px}
+.login-error{background:#fee2e2;color:#991b1b;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:16px;display:none}
+.app-wrapper{display:none}
+.app-wrapper.active{display:block}
 @media(max-width:700px){
   .stats-grid{grid-template-columns:1fr 1fr}
   .form-row{grid-template-columns:1fr}
@@ -109,6 +115,32 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
 </head>
 <body>
 
+<!-- LOGIN SCREEN -->
+<div class="login-screen active" id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>
+      </svg>
+      Procurement System
+    </div>
+    <div class="login-sub">Sign in to your account</div>
+    <div class="login-error" id="login-error">Invalid email or password</div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="your@email.com" onkeydown="if(event.key==='Enter') signIn()">
+    </div>
+    <div class="form-group" style="margin-bottom:22px">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter') signIn()">
+    </div>
+    <button class="btn btn-primary" style="width:100%" id="login-btn" onclick="signIn()">Sign In →</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app-wrapper" id="app-wrapper">
+
 <div class="topbar">
   <div class="topbar-brand">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -117,14 +149,15 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
     Procurement System
   </div>
   <div class="user-chip">
-    <span>Hello, User</span>
-    <div class="avatar">U</div>
+    <span id="topbar-name">Hello</span>
+    <div class="avatar" id="topbar-avatar">?</div>
+    <button class="btn btn-sm" onclick="signOut()" style="margin-left:8px">Sign Out</button>
   </div>
 </div>
 
 <div class="tabs">
   <button class="tab active" onclick="switchTab('dashboard',this)">Dashboard</button>
-  <button class="tab" onclick="switchTab('new',this)">New Request</button>
+  <button class="tab" id="tab-new" onclick="switchTab('new',this)">New Request</button>
   <button class="tab" onclick="switchTab('requests',this)">All Requests</button>
 </div>
 
@@ -298,6 +331,8 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
 
 <div class="toast" id="toast"></div>
 
+</div><!-- end app-wrapper -->
+
 <script>
 const SUPABASE_URL = 'https://uatntzhfbmohdgjtjjqe.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_Z589swlj8XuEwBMvUvNkQQ_VJTaY_sA';
@@ -385,16 +420,20 @@ function openModal(id) {
   document.getElementById('modal-title').textContent = r.id + ' — ' + r.requester;
 
   const actionMap = {
-    'Pending': `<button class="btn btn-success" onclick="updateStatus('${id}','In Order')">✓ Approve & Place In Order</button>`,
-    'In Order': `
+    'Pending':  canDo('canApprove') ? `<button class="btn btn-success" onclick="updateStatus('${id}','In Order')">✓ Approve & Place In Order</button>` : '<span style="font-size:13px;color:#aaa">Awaiting approval</span>',
+    'In Order': canDo('canOrder') ? `
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="font-size:12px;color:#888;font-weight:500">PO Number</label>
+          <input type="text" id="po-number-input" value="${r.po_number || ''}" placeholder="Enter PO number..." style="border:1px solid #d4d0c8;border-radius:8px;padding:7px 10px;font-size:13px;font-family:'Inter',sans-serif;width:200px">
+        </div>
         <div style="display:flex;flex-direction:column;gap:4px">
           <label style="font-size:12px;color:#888;font-weight:500">Expected Delivery Date</label>
           <input type="date" id="delivery-date-input" value="${r.delivery_date || ''}" style="border:1px solid #d4d0c8;border-radius:8px;padding:7px 10px;font-size:13px;font-family:'Inter',sans-serif">
         </div>
         <button class="btn btn-success" style="margin-top:18px" onclick="updateStatusWithDelivery('${id}','Ordered')">📦 Mark as Ordered</button>
-      </div>`,
-    'Ordered': `
+      </div>` : '<span style="font-size:13px;color:#aaa">Awaiting order placement</span>',
+    'Ordered': canDo('canReceive') ? `
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="display:flex;flex-direction:column;gap:4px">
           <label style="font-size:12px;color:#888;font-weight:500">Expected Delivery Date</label>
@@ -404,7 +443,7 @@ function openModal(id) {
           <button class="btn btn-sm" onclick="saveDeliveryDate('${id}')">💾 Save Date</button>
           <button class="btn btn-success btn-sm" onclick="updateStatus('${id}','Received')">✅ Mark as Received</button>
         </div>
-      </div>`,
+      </div>` : '<span style="font-size:13px;color:#aaa">Awaiting delivery confirmation</span>',
     'Received': '<span style="font-size:13px;color:#6b21a8">✅ Order has been received</span>'
   };
 
@@ -432,6 +471,7 @@ function openModal(id) {
       <div class="info-item"><div class="lbl">Requester</div><div class="val">${r.requester}</div></div>
       <div class="info-item"><div class="lbl">Submitted</div><div class="val">${r.created}</div></div>
       ${r.channel ? `<div class="info-item"><div class="lbl">Procurement Channel</div><div class="val">${r.channel}</div></div>` : ''}
+      ${r.po_number ? `<div class="info-item"><div class="lbl">PO Number</div><div class="val">📋 ${r.po_number}</div></div>` : ''}
       ${r.delivery_date ? `<div class="info-item"><div class="lbl">Expected Delivery</div><div class="val">📦 ${r.delivery_date}</div></div>` : ''}
       <div class="info-item" style="grid-column:1/-1"><div class="lbl">Request Details</div><div class="val" style="font-weight:400;font-size:13px;line-height:1.6">${r.justification || '—'}</div></div>
       ${r.quote_url ? `<div class="info-item" style="grid-column:1/-1"><div class="lbl">Price Quote</div><div class="val"><a href="${r.quote_url}" target="_blank" style="color:#1d4ed8;display:inline-flex;align-items:center;gap:6px;font-size:13px">📄 Open PDF ↗</a></div></div>` : ''}
@@ -481,7 +521,7 @@ async function addNote(id) {
   if (!r) return;
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-GB') + ' ' + now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  const newNote = { user: 'User', date: dateStr, text };
+  const newNote = { user: currentName || 'User', date: dateStr, text };
   const newNotes = [...(r.notes || []), newNote];
   const { error } = await db.from('requests').update({ notes: newNotes }).eq('id', id);
   if (error) { showToast('Error saving note'); console.error(error); return; }
@@ -506,7 +546,7 @@ async function updateStatus(id, status, note = '') {
   if (!r) return;
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-GB') + ' ' + now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  const historyEntry = { date: dateStr, user: 'User', status, note };
+  const historyEntry = { date: dateStr, user: currentName || 'User', status, note };
   const newHistory = [...(r.history || []), historyEntry];
   const { error } = await db.from('requests').update({ status, history: newHistory }).eq('id', id);
   if (error) { showToast('Error updating status'); console.error(error); return; }
@@ -517,14 +557,15 @@ async function updateStatus(id, status, note = '') {
 
 async function updateStatusWithDelivery(id, status) {
   const deliveryDate = document.getElementById('delivery-date-input')?.value || '';
+  const poNumber = document.getElementById('po-number-input')?.value.trim() || '';
   const r = allRequests.find(x => x.id === id);
   if (!r) return;
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-GB') + ' ' + now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  const note = deliveryDate ? `Expected delivery: ${deliveryDate}` : '';
-  const historyEntry = { date: dateStr, user: 'User', status, note };
+  const note = [deliveryDate ? `Expected delivery: ${deliveryDate}` : '', poNumber ? `PO: ${poNumber}` : ''].filter(Boolean).join(' | ');
+  const historyEntry = { date: dateStr, user: currentName || 'User', status, note };
   const newHistory = [...(r.history || []), historyEntry];
-  const { error } = await db.from('requests').update({ status, history: newHistory, delivery_date: deliveryDate || null }).eq('id', id);
+  const { error } = await db.from('requests').update({ status, history: newHistory, delivery_date: deliveryDate || null, po_number: poNumber || null }).eq('id', id);
   if (error) { showToast('Error updating'); console.error(error); return; }
   showToast('Status updated: ' + status);
   closeModal();
@@ -688,7 +729,86 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3500);
 }
 
-loadRequests();
+// ROLES & PERMISSIONS
+const ROLE_PERMISSIONS = {
+  project_manager:    { canSubmit: true, canApprove: true, canOrder: true, canReceive: true },
+  rd_manager:         { canSubmit: true, canApprove: true, canOrder: false, canReceive: true },
+  procurement_manager:{ canSubmit: false, canApprove: false, canOrder: true, canReceive: true },
+  warehouse_manager:  { canSubmit: true, canApprove: false, canOrder: false, canReceive: true },
+  system_manager:     { canSubmit: true, canApprove: false, canOrder: true, canReceive: true }
+};
+
+let currentUser = null;
+let currentRole = null;
+let currentName = null;
+
+async function signIn() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Signing in...';
+
+  const { data, error } = await db.auth.signInWithPassword({ email, password });
+  btn.disabled = false;
+  btn.textContent = 'Sign In →';
+
+  if (error) { errEl.style.display = 'block'; errEl.textContent = 'Invalid email or password'; return; }
+
+  const { data: userData } = await db.from('users').select('*').eq('id', data.user.id).single();
+  if (!userData) { errEl.style.display = 'block'; errEl.textContent = 'User not found in system'; return; }
+
+  currentUser = data.user;
+  currentRole = userData.role;
+  currentName = userData.name;
+
+  document.getElementById('topbar-name').textContent = 'Hello, ' + currentName;
+  document.getElementById('topbar-avatar').textContent = currentName.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase();
+
+  // Show/hide New Request tab based on permissions
+  const newTab = document.getElementById('tab-new');
+  if (newTab) newTab.style.display = canDo('canSubmit') ? '' : 'none';
+
+  document.getElementById('login-screen').classList.remove('active');
+  document.getElementById('app-wrapper').classList.add('active');
+
+  await loadRequests();
+}
+
+async function signOut() {
+  await db.auth.signOut();
+  currentUser = null; currentRole = null; currentName = null;
+  document.getElementById('app-wrapper').classList.remove('active');
+  document.getElementById('login-screen').classList.add('active');
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-password').value = '';
+}
+
+function canDo(action) {
+  if (!currentRole) return false;
+  return ROLE_PERMISSIONS[currentRole]?.[action] || false;
+}
+
+// Check existing session on load
+db.auth.getSession().then(async ({ data: { session } }) => {
+  if (session) {
+    const { data: userData } = await db.from('users').select('*').eq('id', session.user.id).single();
+    if (userData) {
+      currentUser = session.user;
+      currentRole = userData.role;
+      currentName = userData.name;
+      document.getElementById('topbar-name').textContent = 'Hello, ' + currentName;
+      document.getElementById('topbar-avatar').textContent = currentName.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase();
+      const newTab = document.getElementById('tab-new');
+      if (newTab) newTab.style.display = canDo('canSubmit') ? '' : 'none';
+      document.getElementById('login-screen').classList.remove('active');
+      document.getElementById('app-wrapper').classList.add('active');
+      await loadRequests();
+    }
+  }
+});
 </script>
 </body>
 </html>
