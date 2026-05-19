@@ -254,19 +254,23 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
                 </div>
                 <div class="form-group">
                   <label style="font-size:12px">Qty</label>
-                  <input type="number" min="1" value="1" class="item-qty">
+                  <input type="number" min="1" value="1" class="item-qty" oninput="updateRowTotal(this)">
                 </div>
               </div>
-              <div style="display:grid;grid-template-columns:120px 100px 1fr 1fr 1fr 36px;gap:12px;align-items:end">
+              <div style="display:grid;grid-template-columns:120px 100px 120px 1fr 1fr 1fr 36px;gap:12px;align-items:end">
                 <div class="form-group">
-                  <label style="font-size:12px">Price</label>
-                  <input type="number" min="0" step="0.01" placeholder="0.00" class="item-price">
+                  <label style="font-size:12px">Unit Price</label>
+                  <input type="number" min="0" step="0.01" placeholder="0.00" class="item-price" oninput="updateRowTotal(this)">
                 </div>
                 <div class="form-group">
                   <label style="font-size:12px">Currency</label>
-                  <select class="item-currency" style="border:1px solid #d4d0c8;border-radius:9px;padding:11px 10px;font-size:15px;background:#fff;font-family:'Inter',sans-serif;width:100%">
+                  <select class="item-currency" onchange="updateRowTotal(this)" style="border:1px solid #d4d0c8;border-radius:9px;padding:11px 10px;font-size:15px;background:#fff;font-family:'Inter',sans-serif;width:100%">
                     <option>$</option><option>€</option><option>£</option><option>₪</option><option>¥</option>
                   </select>
+                </div>
+                <div class="form-group">
+                  <label style="font-size:12px">Total Price</label>
+                  <div class="item-total" style="padding:11px 12px;background:#f0fdf4;border:1px solid #86efac;border-radius:9px;font-size:15px;font-weight:600;color:#166534;min-height:46px">—</div>
                 </div>
                 <div class="form-group">
                   <label style="font-size:12px">Info</label>
@@ -424,10 +428,6 @@ function openModal(id) {
     'In Order': canDo('canOrder') ? `
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="display:flex;flex-direction:column;gap:4px">
-          <label style="font-size:12px;color:#888;font-weight:500">PO Number</label>
-          <input type="text" id="po-number-input" value="${r.po_number || ''}" placeholder="Enter PO number..." style="border:1px solid #d4d0c8;border-radius:8px;padding:7px 10px;font-size:13px;font-family:'Inter',sans-serif;width:200px">
-        </div>
-        <div style="display:flex;flex-direction:column;gap:4px">
           <label style="font-size:12px;color:#888;font-weight:500">Expected Delivery Date</label>
           <input type="date" id="delivery-date-input" value="${r.delivery_date || ''}" style="border:1px solid #d4d0c8;border-radius:8px;padding:7px 10px;font-size:13px;font-family:'Inter',sans-serif">
         </div>
@@ -470,19 +470,36 @@ function openModal(id) {
     <div class="info-grid">
       <div class="info-item"><div class="lbl">Requester</div><div class="val">${r.requester}</div></div>
       <div class="info-item"><div class="lbl">Submitted</div><div class="val">${r.created}</div></div>
-      ${r.channel ? `<div class="info-item"><div class="lbl">Procurement Channel</div><div class="val">${r.channel}</div></div>` : ''}
-      ${r.po_number ? `<div class="info-item"><div class="lbl">PO Number</div><div class="val">📋 ${r.po_number}</div></div>` : ''}
+      <div class="info-item">
+        <div class="lbl">Procurement Channel</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+          <select id="channel-select" style="border:1px solid #d4d0c8;border-radius:8px;padding:7px 10px;font-size:13px;font-family:'Inter',sans-serif;flex:1">
+            <option value="" ${!r.channel?'selected':''}>Not set</option>
+            <option value="Purchase Order" ${r.channel==='Purchase Order'?'selected':''}>Purchase Order</option>
+            <option value="Credit Card" ${r.channel==='Credit Card'?'selected':''}>Credit Card</option>
+          </select>
+          <button class="btn btn-sm" onclick="saveChannel('${id}')">💾</button>
+        </div>
+      </div>
+      <div class="info-item">
+        <div class="lbl">PO Number</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+          <input type="text" id="po-number-edit" value="${r.po_number || ''}" placeholder="Enter PO number..." style="border:1px solid #d4d0c8;border-radius:8px;padding:7px 10px;font-size:13px;font-family:'Inter',sans-serif;flex:1">
+          <button class="btn btn-sm" onclick="savePONumber('${id}')">💾</button>
+        </div>
+      </div>
       ${r.delivery_date ? `<div class="info-item"><div class="lbl">Expected Delivery</div><div class="val">📦 ${r.delivery_date}</div></div>` : ''}
       <div class="info-item" style="grid-column:1/-1"><div class="lbl">Request Details</div><div class="val" style="font-weight:400;font-size:13px;line-height:1.6">${r.justification || '—'}</div></div>
       ${r.quote_url ? `<div class="info-item" style="grid-column:1/-1"><div class="lbl">Price Quote</div><div class="val"><a href="${r.quote_url}" target="_blank" style="color:#1d4ed8;display:inline-flex;align-items:center;gap:6px;font-size:13px">📄 Open PDF ↗</a></div></div>` : ''}
     </div>
     <div style="overflow-x:auto">
     <table class="items-table" style="margin-bottom:14px">
-      <thead><tr><th>Item Name</th><th>PN</th><th>Mfr PN</th><th>Qty</th><th>Price</th><th>Info</th><th>Link</th><th>Vendor</th></tr></thead>
+      <thead><tr><th>Item Name</th><th>PN</th><th>Mfr PN</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>Info</th><th>Link</th><th>Vendor</th></tr></thead>
       <tbody>
         ${(r.items || []).map(i => `<tr>
           <td>${i.name}</td><td>${i.pn||'—'}</td><td>${i.mfrPn||'—'}</td><td>${i.qty}</td>
           <td>${i.price?(i.currency||'')+i.price:'—'}</td>
+          <td style="font-weight:600;color:#166534">${i.price&&i.qty ? (i.currency||'')+(parseFloat(i.price)*parseFloat(i.qty)).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}</td>
           <td style="max-width:160px;white-space:normal">${i.tech||'—'}</td>
           <td>${i.link?`<a href="${i.link}" target="_blank" style="color:#1d4ed8;font-size:12px">Open ↗</a>`:'—'}</td>
           <td>${i.vendor||'—'}</td>
@@ -531,6 +548,24 @@ async function addNote(id) {
   openModal(id);
 }
 
+async function savePONumber(id) {
+  const po_number = document.getElementById('po-number-edit')?.value.trim() || null;
+  const { error } = await db.from('requests').update({ po_number }).eq('id', id);
+  if (error) { showToast('Error saving PO number'); console.error(error); return; }
+  showToast('PO number saved');
+  await loadRequests();
+  openModal(id);
+}
+
+async function saveChannel(id) {
+  const channel = document.getElementById('channel-select')?.value || null;
+  const { error } = await db.from('requests').update({ channel }).eq('id', id);
+  if (error) { showToast('Error saving channel'); console.error(error); return; }
+  showToast('Channel saved');
+  await loadRequests();
+  openModal(id);
+}
+
 async function saveDeliveryDate(id) {
   const deliveryDate = document.getElementById('delivery-date-input')?.value || '';
   if (!deliveryDate) { showToast('Please select a date'); return; }
@@ -557,7 +592,7 @@ async function updateStatus(id, status, note = '') {
 
 async function updateStatusWithDelivery(id, status) {
   const deliveryDate = document.getElementById('delivery-date-input')?.value || '';
-  const poNumber = document.getElementById('po-number-input')?.value.trim() || '';
+  const poNumber = document.getElementById('po-number-edit')?.value.trim() || '';
   const r = allRequests.find(x => x.id === id);
   if (!r) return;
   const now = new Date();
@@ -624,6 +659,16 @@ async function uploadPdf(requestId) {
   return urlData.publicUrl;
 }
 
+function updateRowTotal(input) {
+  const row = input.closest('.item-row');
+  const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
+  const price = parseFloat(row.querySelector('.item-price').value) || 0;
+  const currency = row.querySelector('.item-currency').value;
+  const total = qty * price;
+  const totalEl = row.querySelector('.item-total');
+  totalEl.textContent = total > 0 ? currency + total.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—';
+}
+
 function addRow() {
   const container = document.getElementById('items-body');
   const div = document.createElement('div');
@@ -634,11 +679,12 @@ function addRow() {
       <div class="form-group"><label style="font-size:12px">Item Name</label><input type="text" placeholder="Item name" class="item-name"></div>
       <div class="form-group"><label style="font-size:12px">PN</label><input type="text" placeholder="Optional" class="item-pn"></div>
       <div class="form-group"><label style="font-size:12px">Manufacturer PN</label><input type="text" placeholder="Mfr PN" class="item-mfr-pn"></div>
-      <div class="form-group"><label style="font-size:12px">Qty</label><input type="number" min="1" value="1" class="item-qty"></div>
+      <div class="form-group"><label style="font-size:12px">Qty</label><input type="number" min="1" value="1" class="item-qty" oninput="updateRowTotal(this)"></div>
     </div>
-    <div style="display:grid;grid-template-columns:120px 100px 1fr 1fr 1fr 36px;gap:12px;align-items:end">
-      <div class="form-group"><label style="font-size:12px">Price</label><input type="number" min="0" step="0.01" placeholder="0.00" class="item-price"></div>
-      <div class="form-group"><label style="font-size:12px">Currency</label><select class="item-currency" style="border:1px solid #d4d0c8;border-radius:9px;padding:11px 10px;font-size:15px;background:#fff;font-family:'Inter',sans-serif;width:100%"><option>$</option><option>€</option><option>£</option><option>₪</option><option>¥</option></select></div>
+    <div style="display:grid;grid-template-columns:120px 100px 120px 1fr 1fr 1fr 36px;gap:12px;align-items:end">
+      <div class="form-group"><label style="font-size:12px">Unit Price</label><input type="number" min="0" step="0.01" placeholder="0.00" class="item-price" oninput="updateRowTotal(this)"></div>
+      <div class="form-group"><label style="font-size:12px">Currency</label><select class="item-currency" onchange="updateRowTotal(this)" style="border:1px solid #d4d0c8;border-radius:9px;padding:11px 10px;font-size:15px;background:#fff;font-family:'Inter',sans-serif;width:100%"><option>$</option><option>€</option><option>£</option><option>₪</option><option>¥</option></select></div>
+      <div class="form-group"><label style="font-size:12px">Total Price</label><div class="item-total" style="padding:11px 12px;background:#f0fdf4;border:1px solid #86efac;border-radius:9px;font-size:15px;font-weight:600;color:#166534;min-height:46px">—</div></div>
       <div class="form-group"><label style="font-size:12px">Info</label><input type="text" placeholder="Info..." class="item-tech"></div>
       <div class="form-group"><label style="font-size:12px">Link</label><input type="text" placeholder="https://..." class="item-link"></div>
       <div class="form-group"><label style="font-size:12px">Vendor</label><input type="text" placeholder="Optional" class="item-vendor"></div>
@@ -655,7 +701,7 @@ function removeRow(btn) {
 function clearForm() {
   ['f-requester','f-justification'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-channel').value = '';
-  document.getElementById('items-body').innerHTML = `<div class="item-row" style="background:#f9f8f5;border-radius:12px;padding:16px;margin-bottom:12px;border:1px solid #e8e6e0"><div style="display:grid;grid-template-columns:2fr 1fr 1fr 80px;gap:12px;margin-bottom:12px"><div class="form-group"><label style="font-size:12px">Item Name</label><input type="text" placeholder="Item name" class="item-name"></div><div class="form-group"><label style="font-size:12px">PN</label><input type="text" placeholder="Optional" class="item-pn"></div><div class="form-group"><label style="font-size:12px">Manufacturer PN</label><input type="text" placeholder="Mfr PN" class="item-mfr-pn"></div><div class="form-group"><label style="font-size:12px">Qty</label><input type="number" min="1" value="1" class="item-qty"></div></div><div style="display:grid;grid-template-columns:120px 100px 1fr 1fr 1fr 36px;gap:12px;align-items:end"><div class="form-group"><label style="font-size:12px">Price</label><input type="number" min="0" step="0.01" placeholder="0.00" class="item-price"></div><div class="form-group"><label style="font-size:12px">Currency</label><select class="item-currency" style="border:1px solid #d4d0c8;border-radius:9px;padding:11px 10px;font-size:15px;background:#fff;font-family:'Inter',sans-serif;width:100%"><option>$</option><option>€</option><option>£</option><option>₪</option><option>¥</option></select></div><div class="form-group"><label style="font-size:12px">Info</label><input type="text" placeholder="Info..." class="item-tech"></div><div class="form-group"><label style="font-size:12px">Link</label><input type="text" placeholder="https://..." class="item-link"></div><div class="form-group"><label style="font-size:12px">Vendor</label><input type="text" placeholder="Optional" class="item-vendor"></div><button class="btn btn-sm btn-danger" onclick="removeRow(this)" style="margin-bottom:2px">✕</button></div></div>`;
+  document.getElementById('items-body').innerHTML = `<div class="item-row" style="background:#f9f8f5;border-radius:12px;padding:16px;margin-bottom:12px;border:1px solid #e8e6e0"><div style="display:grid;grid-template-columns:2fr 1fr 1fr 80px;gap:12px;margin-bottom:12px"><div class="form-group"><label style="font-size:12px">Item Name</label><input type="text" placeholder="Item name" class="item-name"></div><div class="form-group"><label style="font-size:12px">PN</label><input type="text" placeholder="Optional" class="item-pn"></div><div class="form-group"><label style="font-size:12px">Manufacturer PN</label><input type="text" placeholder="Mfr PN" class="item-mfr-pn"></div><div class="form-group"><label style="font-size:12px">Qty</label><input type="number" min="1" value="1" class="item-qty" oninput="updateRowTotal(this)"></div></div><div style="display:grid;grid-template-columns:120px 100px 120px 1fr 1fr 1fr 36px;gap:12px;align-items:end"><div class="form-group"><label style="font-size:12px">Unit Price</label><input type="number" min="0" step="0.01" placeholder="0.00" class="item-price" oninput="updateRowTotal(this)"></div><div class="form-group"><label style="font-size:12px">Currency</label><select class="item-currency" onchange="updateRowTotal(this)" style="border:1px solid #d4d0c8;border-radius:9px;padding:11px 10px;font-size:15px;background:#fff;font-family:'Inter',sans-serif;width:100%"><option>$</option><option>€</option><option>£</option><option>₪</option><option>¥</option></select></div><div class="form-group"><label style="font-size:12px">Total Price</label><div class="item-total" style="padding:11px 12px;background:#f0fdf4;border:1px solid #86efac;border-radius:9px;font-size:15px;font-weight:600;color:#166534;min-height:46px">—</div></div><div class="form-group"><label style="font-size:12px">Info</label><input type="text" placeholder="Info..." class="item-tech"></div><div class="form-group"><label style="font-size:12px">Link</label><input type="text" placeholder="https://..." class="item-link"></div><div class="form-group"><label style="font-size:12px">Vendor</label><input type="text" placeholder="Optional" class="item-vendor"></div><button class="btn btn-sm btn-danger" onclick="removeRow(this)" style="margin-bottom:2px">✕</button></div></div>`;
   selectedPdfFile = null;
   document.getElementById('f-pdf').value = '';
   document.getElementById('upload-zone').classList.remove('has-file');
