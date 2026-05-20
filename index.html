@@ -118,12 +118,7 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
 <!-- LOGIN SCREEN -->
 <div class="login-screen active" id="login-screen">
   <div class="login-box">
-    <div class="login-logo">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>
-      </svg>
-      Procurement System
-    </div>
+
     <div class="login-sub">Sign in to your account</div>
     <div class="login-error" id="login-error">Invalid email or password</div>
     <div class="form-group" style="margin-bottom:14px">
@@ -143,9 +138,6 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
 
 <div class="topbar">
   <div class="topbar-brand">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>
-    </svg>
     Procurement System
   </div>
   <div class="user-chip">
@@ -313,6 +305,11 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
         <option value="Ordered">Ordered</option>
         <option value="Received">Received</option>
       </select>
+      <select id="filter-channel" onchange="renderRequests()">
+        <option value="">All Channels</option>
+        <option value="Purchase Order">Purchase Order</option>
+        <option value="Credit Card">Credit Card</option>
+      </select>
       <button class="btn btn-sm" onclick="loadRequests()">↻ Refresh</button>
     </div>
     <div class="requests-list" id="requests-list">
@@ -336,6 +333,8 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
 <div class="toast" id="toast"></div>
 
 </div><!-- end app-wrapper -->
+
+
 
 <script>
 const SUPABASE_URL = 'https://uatntzhfbmohdgjtjjqe.supabase.co';
@@ -394,9 +393,11 @@ function renderDashboard() {
 function renderRequests() {
   const q  = (document.getElementById('search-input').value || '').toLowerCase();
   const st = document.getElementById('filter-status').value;
+  const ch = document.getElementById('filter-channel').value;
   let list = allRequests.filter(r => {
     if (q && !r.id.toLowerCase().includes(q) && !r.requester.toLowerCase().includes(q)) return false;
     if (st && r.status !== st) return false;
+    if (ch && r.channel !== ch) return false;
     return true;
   });
   const el = document.getElementById('requests-list');
@@ -490,7 +491,16 @@ function openModal(id) {
       </div>
       ${r.delivery_date ? `<div class="info-item"><div class="lbl">Expected Delivery</div><div class="val">📦 ${r.delivery_date}</div></div>` : ''}
       <div class="info-item" style="grid-column:1/-1"><div class="lbl">Request Details</div><div class="val" style="font-weight:400;font-size:13px;line-height:1.6">${r.justification || '—'}</div></div>
-      ${r.quote_url ? `<div class="info-item" style="grid-column:1/-1"><div class="lbl">Price Quote</div><div class="val"><a href="${r.quote_url}" target="_blank" style="color:#1d4ed8;display:inline-flex;align-items:center;gap:6px;font-size:13px">📄 Open PDF ↗</a></div></div>` : ''}
+      <div class="info-item" style="grid-column:1/-1">
+        <div class="lbl">Price Quote (PDF)</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap">
+          ${r.quote_url ? `<a href="${r.quote_url}" target="_blank" style="color:#1d4ed8;display:inline-flex;align-items:center;gap:6px;font-size:13px">📄 Open PDF ↗</a>` : '<span style="font-size:13px;color:#aaa">No file uploaded</span>'}
+          <label style="cursor:pointer">
+            <span class="btn btn-sm">📎 ${r.quote_url ? 'Replace PDF' : 'Upload PDF'}</span>
+            <input type="file" accept="application/pdf" style="display:none" onchange="uploadQuoteFromModal('${id}', this)">
+          </label>
+        </div>
+      </div>
     </div>
     <div style="overflow-x:auto">
     <table class="items-table" style="margin-bottom:14px">
@@ -543,6 +553,24 @@ async function addNote(id) {
   const { error } = await db.from('requests').update({ notes: newNotes }).eq('id', id);
   if (error) { showToast('Error saving note'); console.error(error); return; }
   showToast('Note added');
+  closeModal();
+  await loadRequests();
+  openModal(id);
+}
+
+async function uploadQuoteFromModal(id, input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.type !== 'application/pdf') { showToast('Please select a PDF file only'); return; }
+  if (file.size > 10 * 1024 * 1024) { showToast('File exceeds 10MB limit'); return; }
+  showToast('Uploading...');
+  const fileName = `${id}_${Date.now()}.pdf`;
+  const { error } = await db.storage.from('quotes').upload(fileName, file, { contentType: 'application/pdf' });
+  if (error) { showToast('Upload error: ' + error.message); console.error(error); return; }
+  const { data: urlData } = db.storage.from('quotes').getPublicUrl(fileName);
+  const { error: dbError } = await db.from('requests').update({ quote_url: urlData.publicUrl }).eq('id', id);
+  if (dbError) { showToast('Error saving URL'); console.error(dbError); return; }
+  showToast('PDF uploaded successfully!');
   closeModal();
   await loadRequests();
   openModal(id);
