@@ -182,7 +182,7 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
       </div>
       <div class="stat-card stat-inorder">
         <div class="stat-num" id="s-inorder">—</div>
-        <div class="stat-label">In Order</div>
+        <div class="stat-label">To Order</div>
       </div>
       <div class="stat-card stat-extra">
         <div class="stat-num" id="s-received">—</div>
@@ -343,22 +343,28 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
   <div class="page" id="page-requests">
     <div class="filter-bar">
       <input type="text" id="search-input" placeholder="Search by name, ID..." oninput="renderRequests()">
-      <select id="filter-channel" onchange="renderRequests()">
-        <option value="">All Channels</option>
-        <option value="Purchase Order">Purchase Order</option>
-        <option value="Credit Card">Credit Card</option>
-      </select>
-      <select id="filter-label" onchange="renderRequests()">
-        <option value="">All Labels</option>
-        <option>Interceptor UAV</option>
-        <option>Target UAV</option>
-        <option>Lab Materials</option>
-        <option>Assembly Equipment</option>
-        <option>Electronics</option>
-        <option>Mechanical Parts</option>
-        <option>Software</option>
-        <option>Office Supplies</option>
-      </select>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.5px">Channel</label>
+        <select id="filter-channel" onchange="renderRequests()">
+          <option value="">All Channels</option>
+          <option value="Purchase Order">Purchase Order</option>
+          <option value="Credit Card">Credit Card</option>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.5px">Label</label>
+        <select id="filter-label" onchange="renderRequests()">
+          <option value="">All Labels</option>
+          <option>Interceptor UAV</option>
+          <option>Target UAV</option>
+          <option>Lab Materials</option>
+          <option>Assembly Equipment</option>
+          <option>Electronics</option>
+          <option>Mechanical Parts</option>
+          <option>Software</option>
+          <option>Office Supplies</option>
+        </select>
+      </div>
       <button class="btn btn-sm" onclick="loadRequests()">↻ Refresh</button>
     </div>
     <div id="kanban-board" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;align-items:start"></div>
@@ -489,20 +495,20 @@ async function loadRequests() {
 }
 
 function statusClass(s) {
-  return { 'Pending': 'pending', 'In Order': 'inorder', 'Ordered': 'ordered', 'Received': 'received' }[s] || 'pending';
+  return { 'Pending': 'pending', 'To Order': 'inorder', 'Ordered': 'ordered', 'Received': 'received' }[s] || 'pending';
 }
 
 function renderDashboard() {
   const pending  = allRequests.filter(r => r.status === 'Pending').length;
-  const inorder  = allRequests.filter(r => r.status === 'In Order').length;
+  const inorder  = allRequests.filter(r => r.status === 'To Order').length;
   const received = allRequests.filter(r => r.status === 'Received').length;
   document.getElementById('s-total').textContent    = allRequests.length;
   document.getElementById('s-pending').textContent  = pending;
   document.getElementById('s-inorder').textContent  = inorder;
   document.getElementById('s-received').textContent = received;
 
-  const statuses = ['Pending', 'In Order', 'Ordered', 'Received'];
-  const colors   = { 'Pending': '#fcd34d', 'In Order': '#86efac', 'Ordered': '#93c5fd', 'Received': '#d8b4fe' };
+  const statuses = ['Pending', 'To Order', 'Ordered', 'Received'];
+  const colors   = { 'Pending': '#fcd34d', 'To Order': '#86efac', 'Ordered': '#93c5fd', 'Received': '#d8b4fe' };
   const counts   = statuses.map(s => allRequests.filter(r => r.status === s).length);
   const max      = Math.max(...counts, 1);
   document.getElementById('status-chart').innerHTML = statuses.map((s, i) =>
@@ -539,7 +545,7 @@ function renderRequests() {
 
   const statuses = [
     { key: 'Pending',  label: 'Pending',  color: '#fef3c7', textColor: '#92400e', border: '#fcd34d' },
-    { key: 'In Order', label: 'In Order', color: '#dcfce7', textColor: '#166534', border: '#86efac' },
+    { key: 'To Order', label: 'To Order', color: '#dcfce7', textColor: '#166534', border: '#86efac' },
     { key: 'Ordered',  label: 'Ordered',  color: '#dbeafe', textColor: '#1e40af', border: '#93c5fd' },
     { key: 'Received', label: 'Received', color: '#f3e8ff', textColor: '#6b21a8', border: '#d8b4fe' }
   ];
@@ -578,8 +584,8 @@ function openModal(id) {
   document.getElementById('modal-title').textContent = r.id + ' — ' + r.requester;
 
   const actionMap = {
-    'Pending':  canDo('canApprove') ? `<button class="btn btn-success" onclick="updateStatus('${id}','In Order')">✓ Approve & Place In Order</button>` : '<span style="font-size:13px;color:#aaa">Awaiting approval</span>',
-    'In Order': `<div style="display:flex;flex-direction:column;gap:10px;width:100%">
+    'Pending':  canDo('canApprove') ? `<button class="btn btn-success" onclick="updateStatus('${id}','To Order')">✓ Approve & Place To Order</button>` : '<span style="font-size:13px;color:#aaa">Awaiting approval</span>',
+    'To Order': `<div style="display:flex;flex-direction:column;gap:10px;width:100%">
       ${canDo('canOrder') ? `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="display:flex;flex-direction:column;gap:4px">
           <label style="font-size:12px;color:#888;font-weight:500">Expected Delivery Date</label>
@@ -600,7 +606,7 @@ function openModal(id) {
           <button class="btn btn-success btn-sm" onclick="updateStatus('${id}','Received')">✅ Mark as Received</button>
         </div>
       </div>` : '<span style="font-size:13px;color:#aaa">Awaiting delivery confirmation</span>'}
-      ${canDo('canOrder') ? `<button class="btn btn-sm" style="width:fit-content" onclick="updateStatus('${id}','In Order')">↩ Back to In Order</button>` : ''}
+      ${canDo('canOrder') ? `<button class="btn btn-sm" style="width:fit-content" onclick="updateStatus('${id}','To Order')">↩ Back to To Order</button>` : ''}
     </div>`,
     'Received': `<div style="display:flex;flex-direction:column;gap:8px">
       <span style="font-size:13px;color:#6b21a8">✅ Order has been received</span>
