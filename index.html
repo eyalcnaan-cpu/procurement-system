@@ -295,6 +295,29 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
     </div>
   </div>
 
+  <!-- ALL REQUESTS -->
+  <div class="page" id="page-requests">
+    <div class="filter-bar">
+      <input type="text" id="search-input" placeholder="Search by name, ID..." oninput="renderRequests()">
+      <select id="filter-status" onchange="renderRequests()">
+        <option value="">All Statuses</option>
+        <option value="Pending">Pending</option>
+        <option value="In Order">In Order</option>
+        <option value="Ordered">Ordered</option>
+        <option value="Received">Received</option>
+      </select>
+      <select id="filter-channel" onchange="renderRequests()">
+        <option value="">All Channels</option>
+        <option value="Purchase Order">Purchase Order</option>
+        <option value="Credit Card">Credit Card</option>
+      </select>
+      <button class="btn btn-sm" onclick="loadRequests()">↻ Refresh</button>
+    </div>
+    <div class="requests-list" id="requests-list">
+      <div class="loading"><div class="spinner"></div> Loading requests...</div>
+    </div>
+  </div>
+
   <!-- INVENTORY -->
   <div class="page" id="page-inventory">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
@@ -343,6 +366,23 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
         <div class="form-group">
           <label>Notes</label>
           <input type="text" id="inv-notes" placeholder="Optional">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Link</label>
+          <input type="text" id="inv-link" placeholder="https://...">
+        </div>
+        <div class="form-group">
+          <label>PDF File (optional)</label>
+          <div class="upload-zone" id="inv-upload-zone" onclick="document.getElementById('inv-pdf').click()" style="padding:12px;min-height:auto;cursor:pointer">
+            <div id="inv-upload-label" style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:13px">
+              <span>📄 Click to upload PDF</span>
+              <span style="font-size:11px;color:#aaa">PDF only, up to 10MB</span>
+            </div>
+            <div id="inv-upload-chosen" style="display:none;font-size:13px;font-weight:500;color:#166534"></div>
+          </div>
+          <input type="file" id="inv-pdf" accept="application/pdf" style="display:none" onchange="handleInvFileSelect(this)">
         </div>
       </div>
       <div class="form-row">
@@ -886,6 +926,8 @@ function renderInventory() {
             <th>Mfr PN</th>
             <th>Vendor</th>
             <th>Notes</th>
+            <th>Link</th>
+            <th>PDF</th>
             <th style="width:100px;text-align:center">Quantity</th>
             <th style="width:80px;text-align:center">Min</th>
             <th style="width:120px"></th>
@@ -899,6 +941,8 @@ function renderInventory() {
               <td>${i.mfr_pn || '—'}</td>
               <td>${i.vendor || '—'}</td>
               <td>${i.notes || '—'}</td>
+              <td>${i.link ? `<a href="${i.link}" target="_blank" style="color:#1d4ed8;font-size:12px">Open ↗</a>` : '—'}</td>
+              <td>${i.file_url ? `<a href="${i.file_url}" target="_blank" style="color:#1d4ed8;font-size:12px">📄 PDF</a>` : '—'}</td>
               <td style="text-align:center">
                 <div style="display:flex;align-items:center;justify-content:center;gap:6px">
                   <button class="btn btn-sm" onclick="adjustQty('${i.id}', ${i.quantity}, -1)" style="padding:3px 8px">−</button>
@@ -931,6 +975,8 @@ function openAddItemModal() {
   document.getElementById('inv-mfr-pn').value = '';
   document.getElementById('inv-vendor').value = '';
   document.getElementById('inv-notes').value = '';
+  document.getElementById('inv-link').value = '';
+  resetInvPdf();
   document.getElementById('inv-quantity').value = '0';
   document.getElementById('inv-min-quantity').value = '0';
   document.getElementById('inv-edit-id').value = '';
@@ -946,6 +992,8 @@ function openEditItemModal(id) {
   document.getElementById('inv-mfr-pn').value = item.mfr_pn || '';
   document.getElementById('inv-vendor').value = item.vendor || '';
   document.getElementById('inv-notes').value = item.notes || '';
+  document.getElementById('inv-link').value = item.link || '';
+  resetInvPdf();
   document.getElementById('inv-quantity').value = item.quantity || 0;
   document.getElementById('inv-min-quantity').value = item.min_quantity || 0;
   document.getElementById('inv-edit-id').value = id;
@@ -961,18 +1009,26 @@ async function saveInventoryItem() {
     mfr_pn:       document.getElementById('inv-mfr-pn').value.trim() || null,
     vendor:       document.getElementById('inv-vendor').value.trim() || null,
     notes:        document.getElementById('inv-notes').value.trim() || null,
+    link:         document.getElementById('inv-link').value.trim() || null,
     quantity:     parseInt(document.getElementById('inv-quantity').value) || 0,
     min_quantity: parseInt(document.getElementById('inv-min-quantity').value) || 0,
     updated_at:   new Date().toISOString()
   };
   const editId = document.getElementById('inv-edit-id').value;
-  let error;
+  let error, savedId;
   if (editId) {
     ({ error } = await db.from('inventory').update(payload).eq('id', editId));
+    savedId = editId;
   } else {
-    ({ error } = await db.from('inventory').insert([payload]));
+    const { data, error: insertError } = await db.from('inventory').insert([payload]).select().single();
+    error = insertError;
+    savedId = data?.id;
   }
   if (error) { showToast('Error saving item'); console.error(error); return; }
+  if (selectedInvPdfFile && savedId) {
+    const fileUrl = await uploadInvPdf(savedId);
+    if (fileUrl) await db.from('inventory').update({ file_url: fileUrl }).eq('id', savedId);
+  }
   showToast(editId ? 'Item updated' : 'Item added');
   closeInvModal();
   await loadInventory();
@@ -986,6 +1042,37 @@ async function deleteInventoryItem(id, name) {
   await loadInventory();
 }
 
+let selectedInvPdfFile = null;
+
+function handleInvFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.type !== 'application/pdf') { showToast('Please select a PDF file only'); input.value = ''; return; }
+  if (file.size > 10 * 1024 * 1024) { showToast('File exceeds 10MB limit'); input.value = ''; return; }
+  selectedInvPdfFile = file;
+  document.getElementById('inv-upload-zone').classList.add('has-file');
+  document.getElementById('inv-upload-label').style.display = 'none';
+  const chosen = document.getElementById('inv-upload-chosen');
+  chosen.style.display = 'block';
+  chosen.innerHTML = `📄 ${file.name} <span style="color:#888;font-weight:400">(${(file.size/1024).toFixed(0)} KB)</span>`;
+}
+
+async function uploadInvPdf(itemId) {
+  if (!selectedInvPdfFile) return null;
+  const fileName = `inv_${itemId}_${Date.now()}.pdf`;
+  const { error } = await db.storage.from('quotes').upload(fileName, selectedInvPdfFile, { contentType: 'application/pdf' });
+  if (error) { console.error('PDF upload error:', error); return null; }
+  const { data: urlData } = db.storage.from('quotes').getPublicUrl(fileName);
+  return urlData.publicUrl;
+}
+
+function resetInvPdf() {
+  selectedInvPdfFile = null;
+  document.getElementById('inv-pdf').value = '';
+  document.getElementById('inv-upload-zone').classList.remove('has-file');
+  document.getElementById('inv-upload-label').style.display = 'flex';
+  document.getElementById('inv-upload-chosen').style.display = 'none';
+}
 function closeInvModal() { document.getElementById('inv-modal').classList.remove('open'); }
 function handleInvOverlayClick(e) { if (e.target === document.getElementById('inv-modal')) closeInvModal(); }
 
