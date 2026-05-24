@@ -104,8 +104,9 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
 .kanban-card:hover{border-color:#aaa;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
 .kanban-card-title{font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:6px;line-height:1.4}
 .kanban-card-meta{font-size:11px;color:#888;display:flex;flex-direction:column;gap:3px}
-.kanban-empty{font-size:13px;color:#bbb;text-align:center;padding:24px 0}border-radius:12px;padding:28px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;transition:border-color .2s,background .2s;background:#fafaf8}
-.login-screen{display:none;position:fixed;inset:0;background:#f5f4f0;z-index:999;align-items:center;justify-content:center;width:100vw;height:100vh}
+.kanban-empty{font-size:13px;color:#bbb;text-align:center;padding:24px 0}
+.upload-zone{border:2px dashed #d4d0c8;border-radius:12px;padding:28px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;transition:border-color .2s,background .2s;background:#fafaf8}
+.login-screen{display:none;position:fixed;inset:0;background:#f5f4f0;z-index:9999;align-items:center;justify-content:center}
 .login-screen.active{display:flex}
 .login-box{background:#fff;border-radius:16px;border:1px solid #e8e6e0;padding:40px;width:100%;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,0.1)}
 .login-logo{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:600;margin-bottom:8px}
@@ -561,11 +562,9 @@ function renderRequests() {
                 <div style="font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:6px;line-height:1.4">${r.items?.[0]?.name || '—'}${(r.items?.length||0) > 1 ? ` <span style="color:#aaa">+${r.items.length-1}</span>` : ''}</div>
                 <div style="font-size:11px;color:#888;display:flex;flex-direction:column;gap:3px">
                   <span>👤 ${r.requester}</span>
-                  <span>📅 ${r.created}</span>
                   ${r.label ? `<span>🏷 ${r.label}</span>` : ''}
                   ${r.delivery_date && s.key === 'Ordered' ? `<span>🚚 ${r.delivery_date}</span>` : ''}
                   ${r.po_number ? `<span>📋 ${r.po_number}</span>` : ''}
-                  ${r.payment_10th ? '<span style="color:#166534">✅ Pay on 10th</span>' : ''}
                 </div>
               </div>`).join('')}
         </div>
@@ -651,6 +650,13 @@ function openModal(id) {
         <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
           <input type="text" id="po-number-edit" value="${r.po_number || ''}" placeholder="Enter PO number..." style="border:1px solid #d4d0c8;border-radius:8px;padding:7px 10px;font-size:13px;font-family:'Inter',sans-serif;flex:1">
           <button class="btn btn-sm" onclick="savePONumber('${id}')">💾</button>
+        </div>
+      </div>
+      <div class="info-item">
+        <div class="lbl">Bill of Lading</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+          <input type="text" id="bol-edit" value="${r.bill_of_lading || ''}" placeholder="Enter B/L number..." style="border:1px solid #d4d0c8;border-radius:8px;padding:7px 10px;font-size:13px;font-family:'Inter',sans-serif;flex:1">
+          <button class="btn btn-sm" onclick="saveBillOfLading('${id}')">💾</button>
         </div>
       </div>
       ${r.delivery_date ? `<div class="info-item"><div class="lbl">Expected Delivery</div><div class="val">📦 ${r.delivery_date}</div></div>` : ''}
@@ -831,6 +837,15 @@ async function uploadQuoteFromModal(id, input) {
   if (dbError) { showToast('Error saving URL'); console.error(dbError); return; }
   showToast('PDF uploaded successfully!');
   closeModal();
+  await loadRequests();
+  openModal(id);
+}
+
+async function saveBillOfLading(id) {
+  const bol = document.getElementById('bol-edit')?.value.trim() || null;
+  const { error } = await db.from('requests').update({ bill_of_lading: bol }).eq('id', id);
+  if (error) { showToast('Error saving Bill of Lading'); console.error(error); return; }
+  showToast('Bill of Lading saved');
   await loadRequests();
   openModal(id);
 }
