@@ -92,7 +92,19 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
 @keyframes spin{to{transform:rotate(360deg)}}
 .empty-state{text-align:center;padding:56px;color:#888;font-size:15px}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:22px}
-.upload-zone{border:2px dashed #d4d0c8;border-radius:12px;padding:28px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;transition:border-color .2s,background .2s;background:#fafaf8}
+.kanban-col{background:#f9f8f5;border-radius:14px;padding:14px;min-height:200px}
+.kanban-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid}
+.kanban-header-pending{border-color:#fcd34d}
+.kanban-header-inorder{border-color:#86efac}
+.kanban-header-ordered{border-color:#93c5fd}
+.kanban-header-received{border-color:#d8b4fe}
+.kanban-title{font-size:14px;font-weight:600}
+.kanban-count{font-size:12px;font-weight:600;padding:2px 8px;border-radius:20px}
+.kanban-card{background:#fff;border:1px solid #e8e6e0;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:box-shadow .15s,border-color .15s}
+.kanban-card:hover{border-color:#aaa;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
+.kanban-card-title{font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:6px;line-height:1.4}
+.kanban-card-meta{font-size:11px;color:#888;display:flex;flex-direction:column;gap:3px}
+.kanban-empty{font-size:13px;color:#bbb;text-align:center;padding:24px 0}border-radius:12px;padding:28px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;transition:border-color .2s,background .2s;background:#fafaf8}
 .login-screen{display:none;position:fixed;inset:0;background:#f5f4f0;z-index:999;align-items:center;justify-content:center}
 .login-screen.active{display:flex}
 .login-box{background:#fff;border-radius:16px;border:1px solid #e8e6e0;padding:40px;width:100%;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,0.1)}
@@ -214,6 +226,37 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
             </select>
           </div>
           <div class="form-group">
+            <label>Label</label>
+            <div style="display:flex;gap:8px">
+              <select id="f-label" style="flex:1;font-size:15px;border-radius:9px;border:1px solid #d4d0c8;padding:11px 14px;background:#fff;font-family:'Inter',sans-serif">
+                <option value="">No label</option>
+                <option>Interceptor UAV</option>
+                <option>Target UAV</option>
+                <option>Lab Materials</option>
+                <option>Assembly Equipment</option>
+                <option>Electronics</option>
+                <option>Mechanical Parts</option>
+                <option>Software</option>
+                <option>Office Supplies</option>
+              </select>
+              <button class="btn btn-sm" onclick="addLabelPrompt()" title="Add new label">+ New</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Linked to Request (optional)</label>
+            <div style="position:relative">
+              <input type="text" id="f-linked-search" placeholder="Search request ID or item name..." autocomplete="off"
+                oninput="filterLinkedRequests()" onfocus="showLinkedDropdown()" onblur="setTimeout(hideLinkedDropdown,200)"
+                style="font-size:15px;border-radius:9px;border:1px solid #d4d0c8;padding:11px 14px;background:#fff;width:100%;font-family:'Inter',sans-serif">
+              <input type="hidden" id="f-linked" value="">
+              <div id="linked-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d4d0c8;border-radius:9px;max-height:200px;overflow-y:auto;z-index:50;box-shadow:0 4px 16px rgba(0,0,0,0.1);margin-top:4px"></div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;padding:12px;background:#f0fdf4;border-radius:9px;border:1px solid #86efac">
+            <input type="checkbox" id="f-payment10" checked style="width:18px;height:18px;cursor:pointer">
+            <label for="f-payment10" style="font-size:14px;color:#166534;cursor:pointer;font-weight:500">Payment can be made on the 10th of the month</label>
+          </div>
+          <div class="form-group">
             <label>Price Quote (PDF — optional)</label>
             <div class="upload-zone" id="upload-zone" onclick="document.getElementById('f-pdf').click()" ondragover="handleDragOver(event)" ondrop="handleDrop(event)">
               <div id="upload-label" style="display:flex;flex-direction:column;align-items:center;gap:6px">
@@ -299,23 +342,25 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
   <div class="page" id="page-requests">
     <div class="filter-bar">
       <input type="text" id="search-input" placeholder="Search by name, ID..." oninput="renderRequests()">
-      <select id="filter-status" onchange="renderRequests()">
-        <option value="">All Statuses</option>
-        <option value="Pending">Pending</option>
-        <option value="In Order">In Order</option>
-        <option value="Ordered">Ordered</option>
-        <option value="Received">Received</option>
-      </select>
       <select id="filter-channel" onchange="renderRequests()">
         <option value="">All Channels</option>
         <option value="Purchase Order">Purchase Order</option>
         <option value="Credit Card">Credit Card</option>
       </select>
+      <select id="filter-label" onchange="renderRequests()">
+        <option value="">All Labels</option>
+        <option>Interceptor UAV</option>
+        <option>Target UAV</option>
+        <option>Lab Materials</option>
+        <option>Assembly Equipment</option>
+        <option>Electronics</option>
+        <option>Mechanical Parts</option>
+        <option>Software</option>
+        <option>Office Supplies</option>
+      </select>
       <button class="btn btn-sm" onclick="loadRequests()">↻ Refresh</button>
     </div>
-    <div class="requests-list" id="requests-list">
-      <div class="loading"><div class="spinner"></div> Loading requests...</div>
-    </div>
+    <div id="kanban-board" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;align-items:start"></div>
   </div>
 
   <!-- INVENTORY -->
@@ -477,35 +522,55 @@ function renderDashboard() {
 
 function renderRequests() {
   const searchEl = document.getElementById('search-input');
-  const statusEl = document.getElementById('filter-status');
   const channelEl = document.getElementById('filter-channel');
-  if (!searchEl || !statusEl || !channelEl) return;
+  if (!searchEl) return;
   const q  = (searchEl.value || '').toLowerCase();
-  const st = statusEl.value;
-  const ch = channelEl.value;
+  const ch = channelEl?.value || '';
+  const lb = document.getElementById('filter-label')?.value || '';
+
   let list = allRequests.filter(r => {
-    if (q && !r.id.toLowerCase().includes(q) && !r.requester.toLowerCase().includes(q)) return false;
-    if (st && r.status !== st) return false;
+    if (q && !r.id.toLowerCase().includes(q) && !r.requester.toLowerCase().includes(q) &&
+        !(r.items?.[0]?.name || '').toLowerCase().includes(q)) return false;
     if (ch && r.channel !== ch) return false;
+    if (lb && r.label !== lb) return false;
     return true;
   });
-  const el = document.getElementById('requests-list');
-  if (!list.length) { el.innerHTML = '<div class="empty-state">No requests found</div>'; return; }
-  el.innerHTML = list.map(r => `
-    <div class="req-item" onclick="openModal('${r.id}')">
-      <div class="req-header">
-        <span class="req-title">${r.id} — ${r.items && r.items.length > 0 ? (r.items.length > 1 ? r.items[0].name + ' +' + (r.items.length-1) + ' more' : r.items[0].name) : 'No items'}</span>
-        <div style="display:flex;align-items:center;gap:8px">
-          ${r.status === 'Ordered' && r.delivery_date ? `<span style="font-size:12px;color:#888">🚚 ${r.delivery_date}</span>` : ''}
-          <span class="badge badge-${statusClass(r.status)}">${r.status}</span>
+
+  const statuses = [
+    { key: 'Pending',  label: 'Pending',  color: '#fef3c7', textColor: '#92400e', border: '#fcd34d' },
+    { key: 'In Order', label: 'In Order', color: '#dcfce7', textColor: '#166534', border: '#86efac' },
+    { key: 'Ordered',  label: 'Ordered',  color: '#dbeafe', textColor: '#1e40af', border: '#93c5fd' },
+    { key: 'Received', label: 'Received', color: '#f3e8ff', textColor: '#6b21a8', border: '#d8b4fe' }
+  ];
+
+  const board = document.getElementById('kanban-board');
+  if (!board) return;
+  board.innerHTML = statuses.map(s => {
+    const cards = list.filter(r => r.status === s.key);
+    return `
+      <div style="background:#f9f8f5;border-radius:14px;padding:14px;min-height:200px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid ${s.border}">
+          <span style="font-size:14px;font-weight:600">${s.label}</span>
+          <span style="font-size:12px;font-weight:600;padding:2px 10px;border-radius:20px;background:${s.color};color:${s.textColor}">${cards.length}</span>
         </div>
-      </div>
-      <div class="req-meta">
-        <span>👤 ${r.requester}</span>
-        <span>📅 ${r.created}</span>
-        <span>${r.items ? r.items.length + ' item(s)' : ''}</span>
-      </div>
-    </div>`).join('');
+        <div>
+          ${cards.length === 0 ? '<div style="font-size:13px;color:#bbb;text-align:center;padding:24px 0">No requests</div>' :
+            cards.map(r => `
+              <div class="kanban-card" onclick="openModal('${r.id}')">
+                <div style="font-size:12px;font-weight:700;color:#888;margin-bottom:3px">${r.id}</div>
+                <div style="font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:6px;line-height:1.4">${r.items?.[0]?.name || '—'}${(r.items?.length||0) > 1 ? ` <span style="color:#aaa">+${r.items.length-1}</span>` : ''}</div>
+                <div style="font-size:11px;color:#888;display:flex;flex-direction:column;gap:3px">
+                  <span>👤 ${r.requester}</span>
+                  <span>📅 ${r.created}</span>
+                  ${r.label ? `<span>🏷 ${r.label}</span>` : ''}
+                  ${r.delivery_date && s.key === 'Ordered' ? `<span>🚚 ${r.delivery_date}</span>` : ''}
+                  ${r.po_number ? `<span>📋 ${r.po_number}</span>` : ''}
+                  ${r.payment_10th ? '<span style="color:#166534">✅ Pay on 10th</span>' : ''}
+                </div>
+              </div>`).join('')}
+        </div>
+      </div>`;
+  }).join('');
 }
 
 function openModal(id) {
@@ -515,16 +580,18 @@ function openModal(id) {
 
   const actionMap = {
     'Pending':  canDo('canApprove') ? `<button class="btn btn-success" onclick="updateStatus('${id}','In Order')">✓ Approve & Place In Order</button>` : '<span style="font-size:13px;color:#aaa">Awaiting approval</span>',
-    'In Order': canDo('canOrder') ? `
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    'In Order': `<div style="display:flex;flex-direction:column;gap:10px;width:100%">
+      ${canDo('canOrder') ? `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="display:flex;flex-direction:column;gap:4px">
           <label style="font-size:12px;color:#888;font-weight:500">Expected Delivery Date</label>
           <input type="date" id="delivery-date-input" value="${r.delivery_date || ''}" style="border:1px solid #d4d0c8;border-radius:8px;padding:7px 10px;font-size:13px;font-family:'Inter',sans-serif">
         </div>
         <button class="btn btn-success" style="margin-top:18px" onclick="updateStatusWithDelivery('${id}','Ordered')">📦 Mark as Ordered</button>
-      </div>` : '<span style="font-size:13px;color:#aaa">Awaiting order placement</span>',
-    'Ordered': canDo('canReceive') ? `
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      </div>` : '<span style="font-size:13px;color:#aaa">Awaiting order placement</span>'}
+      ${canDo('canApprove') ? `<button class="btn btn-sm" style="width:fit-content" onclick="updateStatus('${id}','Pending')">↩ Back to Pending</button>` : ''}
+    </div>`,
+    'Ordered': `<div style="display:flex;flex-direction:column;gap:10px;width:100%">
+      ${canDo('canReceive') ? `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="display:flex;flex-direction:column;gap:4px">
           <label style="font-size:12px;color:#888;font-weight:500">Expected Delivery Date</label>
           <input type="date" id="delivery-date-input" value="${r.delivery_date || ''}" style="border:1px solid #d4d0c8;border-radius:8px;padding:7px 10px;font-size:13px;font-family:'Inter',sans-serif">
@@ -533,8 +600,13 @@ function openModal(id) {
           <button class="btn btn-sm" onclick="saveDeliveryDate('${id}')">💾 Save Date</button>
           <button class="btn btn-success btn-sm" onclick="updateStatus('${id}','Received')">✅ Mark as Received</button>
         </div>
-      </div>` : '<span style="font-size:13px;color:#aaa">Awaiting delivery confirmation</span>',
-    'Received': '<span style="font-size:13px;color:#6b21a8">✅ Order has been received</span>'
+      </div>` : '<span style="font-size:13px;color:#aaa">Awaiting delivery confirmation</span>'}
+      ${canDo('canOrder') ? `<button class="btn btn-sm" style="width:fit-content" onclick="updateStatus('${id}','In Order')">↩ Back to In Order</button>` : ''}
+    </div>`,
+    'Received': `<div style="display:flex;flex-direction:column;gap:8px">
+      <span style="font-size:13px;color:#6b21a8">✅ Order has been received</span>
+      ${canDo('canReceive') ? `<button class="btn btn-sm" style="width:fit-content" onclick="updateStatus('${id}','Ordered')">↩ Back to Ordered</button>` : ''}
+    </div>`
   };
 
   const historyHtml = (r.history && r.history.length) ? `
@@ -560,6 +632,9 @@ function openModal(id) {
     <div class="info-grid">
       <div class="info-item"><div class="lbl">Requester</div><div class="val">${r.requester}</div></div>
       <div class="info-item"><div class="lbl">Submitted</div><div class="val">${r.created}</div></div>
+      ${r.label ? `<div class="info-item"><div class="lbl">Label</div><div class="val">🏷 ${r.label}</div></div>` : ''}
+      ${r.linked_request_id ? `<div class="info-item"><div class="lbl">Linked Request</div><div class="val" style="cursor:pointer;color:#1d4ed8" onclick="closeModal();openModal('${r.linked_request_id}')">🔗 ${r.linked_request_id}</div></div>` : ''}
+      <div class="info-item"><div class="lbl">Payment on 10th</div><div class="val">${r.payment_10th ? '✅ Yes' : '❌ No'}</div></div>
       <div class="info-item">
         <div class="lbl">Procurement Channel</div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
@@ -581,12 +656,18 @@ function openModal(id) {
       ${r.delivery_date ? `<div class="info-item"><div class="lbl">Expected Delivery</div><div class="val">📦 ${r.delivery_date}</div></div>` : ''}
       <div class="info-item" style="grid-column:1/-1"><div class="lbl">Request Details</div><div class="val" style="font-weight:400;font-size:13px;line-height:1.6">${r.justification || '—'}</div></div>
       <div class="info-item" style="grid-column:1/-1">
-        <div class="lbl">Price Quote (PDF)</div>
-        <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap">
-          ${r.quote_url ? `<a href="${r.quote_url}" target="_blank" style="color:#1d4ed8;display:inline-flex;align-items:center;gap:6px;font-size:13px">📄 Open PDF ↗</a>` : '<span style="font-size:13px;color:#aaa">No file uploaded</span>'}
-          <label style="cursor:pointer">
-            <span class="btn btn-sm">📎 ${r.quote_url ? 'Replace PDF' : 'Upload PDF'}</span>
-            <input type="file" accept="application/pdf" style="display:none" onchange="uploadQuoteFromModal('${id}', this)">
+        <div class="lbl">Attachments</div>
+        <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">
+          ${(r.attachments && r.attachments.length) ? r.attachments.map((a,i) => `
+            <div style="display:flex;align-items:center;gap:8px;font-size:13px">
+              <span>${a.type === 'image' ? '🖼' : '📄'}</span>
+              <a href="${a.url}" target="_blank" style="color:#1d4ed8;flex:1">${a.name}</a>
+              <button class="btn btn-sm btn-danger" onclick="removeAttachment('${id}',${i})">✕</button>
+            </div>`).join('') : '<span style="font-size:13px;color:#aaa">No attachments</span>'}
+          ${r.quote_url ? `<div style="display:flex;align-items:center;gap:8px;font-size:13px"><span>📄</span><a href="${r.quote_url}" target="_blank" style="color:#1d4ed8;flex:1">Original Quote PDF</a></div>` : ''}
+          <label style="cursor:pointer;margin-top:4px">
+            <span class="btn btn-sm">📎 Add File (PDF or Image)</span>
+            <input type="file" accept="application/pdf,image/*" style="display:none" onchange="addAttachment('${id}', this)">
           </label>
         </div>
       </div>
@@ -642,6 +723,95 @@ async function addNote(id) {
   const { error } = await db.from('requests').update({ notes: newNotes }).eq('id', id);
   if (error) { showToast('Error saving note'); console.error(error); return; }
   showToast('Note added');
+  closeModal();
+  await loadRequests();
+  openModal(id);
+}
+
+function populateLinkedRequests() {
+  // just ensure the field is cleared on tab switch
+  document.getElementById('f-linked').value = '';
+  document.getElementById('f-linked-search').value = '';
+}
+
+function showLinkedDropdown() {
+  filterLinkedRequests();
+  document.getElementById('linked-dropdown').style.display = 'block';
+}
+
+function hideLinkedDropdown() {
+  document.getElementById('linked-dropdown').style.display = 'none';
+}
+
+function filterLinkedRequests() {
+  const q = (document.getElementById('f-linked-search').value || '').toLowerCase();
+  const dropdown = document.getElementById('linked-dropdown');
+  const filtered = allRequests.filter(r =>
+    !q || r.id.toLowerCase().includes(q) ||
+    (r.items?.[0]?.name || '').toLowerCase().includes(q) ||
+    r.requester.toLowerCase().includes(q)
+  ).slice(0, 20);
+
+  dropdown.style.display = 'block';
+  dropdown.innerHTML = `<div style="padding:8px 12px;font-size:13px;color:#888;cursor:pointer;border-bottom:1px solid #f0ede8"
+    onmousedown="selectLinkedRequest('','None')">— None —</div>` +
+    filtered.map(r => `<div style="padding:10px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f0ede8"
+      onmousedown="selectLinkedRequest('${r.id}','${r.id} — ${(r.items?.[0]?.name || r.requester).replace(/'/g,"\\'")}')">
+      <span style="font-weight:600">${r.id}</span>
+      <span style="color:#888"> — ${r.items?.[0]?.name || r.requester}</span>
+      <span class="badge badge-${statusClass(r.status)}" style="font-size:11px;padding:1px 7px;margin-right:6px">${r.status}</span>
+    </div>`).join('') +
+    (filtered.length === 0 ? '<div style="padding:10px 12px;font-size:13px;color:#aaa">No results</div>' : '');
+}
+
+function selectLinkedRequest(id, label) {
+  document.getElementById('f-linked').value = id;
+  document.getElementById('f-linked-search').value = id ? label : '';
+  document.getElementById('linked-dropdown').style.display = 'none';
+}
+
+function addLabelPrompt() {
+  const label = prompt('Enter new label name:');
+  if (!label || !label.trim()) return;
+  const sel = document.getElementById('f-label');
+  const opt = document.createElement('option');
+  opt.value = label.trim();
+  opt.textContent = label.trim();
+  sel.appendChild(opt);
+  sel.value = label.trim();
+  showToast('Label added');
+}
+
+async function addAttachment(id, input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) { showToast('File exceeds 10MB'); return; }
+  showToast('Uploading...');
+  const isImage = file.type.startsWith('image/');
+  const ext = file.name.split('.').pop();
+  const fileName = `${id}_${Date.now()}.${ext}`;
+  const bucket = isImage ? 'quotes' : 'quotes';
+  const { error } = await db.storage.from(bucket).upload(fileName, file, { contentType: file.type });
+  if (error) { showToast('Upload error: ' + error.message); return; }
+  const { data: urlData } = db.storage.from(bucket).getPublicUrl(fileName);
+  const r = allRequests.find(x => x.id === id);
+  if (!r) return;
+  const newAttachments = [...(r.attachments || []), { name: file.name, url: urlData.publicUrl, type: isImage ? 'image' : 'pdf' }];
+  const { error: dbError } = await db.from('requests').update({ attachments: newAttachments }).eq('id', id);
+  if (dbError) { showToast('Error saving attachment'); return; }
+  showToast('File uploaded!');
+  closeModal();
+  await loadRequests();
+  openModal(id);
+}
+
+async function removeAttachment(id, index) {
+  const r = allRequests.find(x => x.id === id);
+  if (!r) return;
+  const newAttachments = (r.attachments || []).filter((_, i) => i !== index);
+  const { error } = await db.from('requests').update({ attachments: newAttachments }).eq('id', id);
+  if (error) { showToast('Error removing attachment'); return; }
+  showToast('Attachment removed');
   closeModal();
   await loadRequests();
   openModal(id);
@@ -738,6 +908,7 @@ function switchTab(t, btn) {
   document.getElementById('page-' + t).classList.add('active');
   if (t === 'requests') renderRequests();
   if (t === 'inventory') loadInventory();
+  if (t === 'new') populateLinkedRequests();
 }
 
 let selectedPdfFile = null;
@@ -823,6 +994,10 @@ function removeRow(btn) {
 function clearForm() {
   ['f-requester','f-justification'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-channel').value = '';
+  document.getElementById('f-label').value = '';
+  document.getElementById('f-linked').value = '';
+  document.getElementById('f-linked-search').value = '';
+  document.getElementById('f-payment10').checked = true;
   document.getElementById('items-body').innerHTML = `<div class="item-row" style="background:#f9f8f5;border-radius:12px;padding:16px;margin-bottom:12px;border:1px solid #e8e6e0"><div style="display:grid;grid-template-columns:2fr 1fr 1fr 80px;gap:12px;margin-bottom:12px"><div class="form-group"><label style="font-size:12px">Item Name</label><input type="text" placeholder="Item name" class="item-name"></div><div class="form-group"><label style="font-size:12px">PN</label><input type="text" placeholder="Optional" class="item-pn"></div><div class="form-group"><label style="font-size:12px">Manufacturer PN</label><input type="text" placeholder="Mfr PN" class="item-mfr-pn"></div><div class="form-group"><label style="font-size:12px">Qty</label><input type="number" min="1" value="1" class="item-qty" oninput="updateRowTotal(this)"></div></div><div style="display:grid;grid-template-columns:120px 100px 120px 1fr 1fr 1fr 36px;gap:12px;align-items:end"><div class="form-group"><label style="font-size:12px">Unit Price</label><input type="number" min="0" step="0.01" placeholder="0.00" class="item-price" oninput="updateRowTotal(this)"></div><div class="form-group"><label style="font-size:12px">Currency</label><select class="item-currency" onchange="updateRowTotal(this)" style="border:1px solid #d4d0c8;border-radius:9px;padding:11px 10px;font-size:15px;background:#fff;font-family:'Inter',sans-serif;width:100%"><option>$</option><option>€</option><option>£</option><option>₪</option><option>¥</option></select></div><div class="form-group"><label style="font-size:12px">Total Price</label><div class="item-total" style="padding:11px 12px;background:#f0fdf4;border:1px solid #86efac;border-radius:9px;font-size:15px;font-weight:600;color:#166534;min-height:46px">—</div></div><div class="form-group"><label style="font-size:12px">Info</label><input type="text" placeholder="Info..." class="item-tech"></div><div class="form-group"><label style="font-size:12px">Link</label><input type="text" placeholder="https://..." class="item-link"></div><div class="form-group"><label style="font-size:12px">Vendor</label><input type="text" placeholder="Optional" class="item-vendor"></div><button class="btn btn-sm btn-danger" onclick="removeRow(this)" style="margin-bottom:2px">✕</button></div></div>`;
   selectedPdfFile = null;
   document.getElementById('f-pdf').value = '';
@@ -857,7 +1032,7 @@ async function submitRequest() {
   btn.disabled = true;
   btn.textContent = selectedPdfFile ? 'Uploading...' : 'Submitting...';
 
-  const id = 'RQ-' + String(nextIdNum).padStart(3, '0');
+  const id = 'RQ-' + String(nextIdNum).padStart(6, '0');
   const quoteUrl = await uploadPdf(id);
   if (selectedPdfFile && !quoteUrl) {
     showToast('Error uploading file — please try again');
@@ -873,8 +1048,12 @@ async function submitRequest() {
     justification: document.getElementById('f-justification').value.trim(),
     status: 'Pending',
     items,
+    label: document.getElementById('f-label').value || null,
     channel: document.getElementById('f-channel').value,
+    linked_request_id: document.getElementById('f-linked').value || null,
+    payment_10th: document.getElementById('f-payment10').checked,
     quote_url: quoteUrl || null,
+    attachments: [],
     delivery_date: null,
     history: [{ date: dateStr, user: requester, status: 'Pending', note: 'Request submitted' }],
     created: now.toISOString().slice(0,10)
