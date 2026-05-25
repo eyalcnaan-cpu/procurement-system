@@ -66,6 +66,7 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
 .badge-inorder{background:#dcfce7;color:#166534}
 .badge-ordered{background:#dbeafe;color:#1e40af}
 .badge-received{background:#f3e8ff;color:#6b21a8}
+.badge-instock{background:#dcfce7;color:#14532d}
 .filter-bar{display:flex;gap:12px;margin-bottom:20px;align-items:center}
 .filter-bar select,.filter-bar input{font-size:14px;padding:10px 14px;border:1px solid #d4d0c8;border-radius:9px;background:#fff;color:#1a1a1a;font-family:'Inter',sans-serif}
 .filter-bar input{flex:1}
@@ -365,9 +366,17 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
           <option>Office Supplies</option>
         </select>
       </div>
+        <select id="filter-status" onchange="renderRequests()" style="display:none">
+          <option value="">All</option>
+          <option value="Pending">Pending</option>
+          <option value="To Order">To Order</option>
+          <option value="Ordered">Ordered</option>
+          <option value="Received">Received</option>
+          <option value="In Stock">In Stock</option>
+        </select>
       <button class="btn btn-sm" onclick="loadRequests()">↻ Refresh</button>
     </div>
-    <div id="kanban-board" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;align-items:start"></div>
+    <div id="kanban-board" style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;align-items:start"></div>
   </div>
 
   <!-- INVENTORY -->
@@ -495,20 +504,21 @@ async function loadRequests() {
 }
 
 function statusClass(s) {
-  return { 'Pending': 'pending', 'To Order': 'inorder', 'Ordered': 'ordered', 'Received': 'received' }[s] || 'pending';
+  return { 'Pending': 'pending', 'To Order': 'inorder', 'Ordered': 'ordered', 'Received': 'received', 'In Stock': 'instock' }[s] || 'pending';
 }
 
 function renderDashboard() {
   const pending  = allRequests.filter(r => r.status === 'Pending').length;
   const inorder  = allRequests.filter(r => r.status === 'To Order').length;
   const received = allRequests.filter(r => r.status === 'Received').length;
+  const instock  = allRequests.filter(r => r.status === 'In Stock').length;
   document.getElementById('s-total').textContent    = allRequests.length;
   document.getElementById('s-pending').textContent  = pending;
   document.getElementById('s-inorder').textContent  = inorder;
-  document.getElementById('s-received').textContent = received;
+  document.getElementById('s-received').textContent = received + instock;
 
-  const statuses = ['Pending', 'To Order', 'Ordered', 'Received'];
-  const colors   = { 'Pending': '#fcd34d', 'To Order': '#86efac', 'Ordered': '#93c5fd', 'Received': '#d8b4fe' };
+  const statuses = ['Pending', 'To Order', 'Ordered', 'Received', 'In Stock'];
+  const colors   = { 'Pending': '#fcd34d', 'To Order': '#86efac', 'Ordered': '#93c5fd', 'Received': '#d8b4fe', 'In Stock': '#bbf7d0' };
   const counts   = statuses.map(s => allRequests.filter(r => r.status === s).length);
   const max      = Math.max(...counts, 1);
   document.getElementById('status-chart').innerHTML = statuses.map((s, i) =>
@@ -547,7 +557,8 @@ function renderRequests() {
     { key: 'Pending',  label: 'Pending',  color: '#fef3c7', textColor: '#92400e', border: '#fcd34d' },
     { key: 'To Order', label: 'To Order', color: '#dcfce7', textColor: '#166534', border: '#86efac' },
     { key: 'Ordered',  label: 'Ordered',  color: '#dbeafe', textColor: '#1e40af', border: '#93c5fd' },
-    { key: 'Received', label: 'Received', color: '#f3e8ff', textColor: '#6b21a8', border: '#d8b4fe' }
+    { key: 'Received', label: 'Received', color: '#f3e8ff', textColor: '#6b21a8', border: '#d8b4fe' },
+    { key: 'In Stock', label: 'In Stock', color: '#dcfce7', textColor: '#14532d', border: '#4ade80' }
   ];
 
   const board = document.getElementById('kanban-board');
@@ -609,8 +620,12 @@ function openModal(id) {
       ${canDo('canOrder') ? `<button class="btn btn-sm" style="width:fit-content" onclick="updateStatus('${id}','To Order')">↩ Back to To Order</button>` : ''}
     </div>`,
     'Received': `<div style="display:flex;flex-direction:column;gap:8px">
-      <span style="font-size:13px;color:#6b21a8">✅ Order has been received</span>
+      ${canDo('canStock') ? `<button class="btn btn-success" onclick="updateStatus('${id}','In Stock')">📦 Mark as In Stock</button>` : '<span style="font-size:13px;color:#aaa">Awaiting stock confirmation</span>'}
       ${canDo('canReceive') ? `<button class="btn btn-sm" style="width:fit-content" onclick="updateStatus('${id}','Ordered')">↩ Back to Ordered</button>` : ''}
+    </div>`,
+    'In Stock': `<div style="display:flex;flex-direction:column;gap:8px">
+      <span style="font-size:13px;color:#14532d">✅ Item is in stock</span>
+      ${canDo('canStock') ? `<button class="btn btn-sm" style="width:fit-content" onclick="updateStatus('${id}','Received')">↩ Back to Received</button>` : ''}
     </div>`
   };
 
@@ -893,7 +908,7 @@ async function updateStatus(id, status, note = '') {
   const newHistory = [...(r.history || []), historyEntry];
   const { error } = await db.from('requests').update({ status, history: newHistory }).eq('id', id);
   if (error) { showToast('Error updating status'); console.error(error); return; }
-  if (status === 'Received') {
+  if (status === 'In Stock') {
     const r = allRequests.find(x => x.id === id);
     if (r) await addToInventoryFromRequest(r);
   }
@@ -1389,11 +1404,11 @@ function showToast(msg) {
 
 // ROLES & PERMISSIONS
 const ROLE_PERMISSIONS = {
-  project_manager:    { canSubmit: true, canApprove: true, canOrder: true, canReceive: true },
-  rd_manager:         { canSubmit: true, canApprove: true, canOrder: false, canReceive: true },
-  procurement_manager:{ canSubmit: false, canApprove: false, canOrder: true, canReceive: true },
-  warehouse_manager:  { canSubmit: true, canApprove: false, canOrder: false, canReceive: true },
-  system_manager:     { canSubmit: true, canApprove: false, canOrder: true, canReceive: true }
+  project_manager:    { canSubmit: true, canApprove: true, canOrder: true, canReceive: true, canStock: false },
+  rd_manager:         { canSubmit: true, canApprove: true, canOrder: false, canReceive: true, canStock: true },
+  procurement_manager:{ canSubmit: false, canApprove: false, canOrder: true, canReceive: true, canStock: false },
+  warehouse_manager:  { canSubmit: true, canApprove: false, canOrder: false, canReceive: true, canStock: true },
+  system_manager:     { canSubmit: true, canApprove: false, canOrder: true, canReceive: true, canStock: false }
 };
 
 let currentUser = null;
