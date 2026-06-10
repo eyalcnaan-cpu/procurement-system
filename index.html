@@ -395,7 +395,16 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
 
 </div>
 
-<!-- ADD/EDIT ITEM MODAL -->
+<!-- EDIT REQUEST MODAL -->
+<div class="modal-overlay" id="edit-modal" onclick="handleEditOverlayClick(event)">
+  <div class="modal-box" style="max-width:800px">
+    <div class="modal-header">
+      <h3 id="edit-modal-title">Edit Request</h3>
+      <button class="btn btn-sm" onclick="closeEditModal()">✕ Close</button>
+    </div>
+    <div id="edit-modal-content"></div>
+  </div>
+</div>
 <div class="modal-overlay" id="inv-modal" onclick="handleInvOverlayClick(event)">
   <div class="modal-box" style="max-width:500px">
     <div class="modal-header">
@@ -470,7 +479,10 @@ body{font-family:'Inter',sans-serif;background:#f5f4f0;color:#1a1a1a;direction:l
   <div class="modal-box">
     <div class="modal-header">
       <h3 id="modal-title">Request Details</h3>
-      <button class="btn btn-sm" onclick="closeModal()">✕ Close</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" id="modal-edit-btn">✏️ Edit</button>
+        <button class="btn btn-sm" onclick="closeModal()">✕ Close</button>
+      </div>
     </div>
     <div id="modal-content"></div>
   </div>
@@ -593,6 +605,7 @@ function openModal(id) {
   const r = allRequests.find(x => x.id === id);
   if (!r) return;
   document.getElementById('modal-title').textContent = r.id + ' — ' + r.requester;
+  document.getElementById('modal-edit-btn').onclick = () => openEditRequestModal(id);
 
   const actionMap = {
     'Pending':  canDo('canApprove') ? `<button class="btn btn-success" onclick="updateStatus('${id}','To Order')">✓ Approve & Place To Order</button>` : '<span style="font-size:13px;color:#aaa">Awaiting approval</span>',
@@ -1249,6 +1262,9 @@ async function saveInventoryItem() {
   await loadInventory();
 }
 
+async function closeInvModal() { document.getElementById('inv-modal').classList.remove('open'); }
+function handleInvOverlayClick(e) { if (e.target === document.getElementById('inv-modal')) closeInvModal(); }
+
 async function deleteInventoryItem(id, name) {
   if (!confirm(`Delete "${name}" from inventory?`)) return;
   const { error } = await db.from('inventory').delete().eq('id', id);
@@ -1288,8 +1304,163 @@ function resetInvPdf() {
   document.getElementById('inv-upload-label').style.display = 'flex';
   document.getElementById('inv-upload-chosen').style.display = 'none';
 }
-function closeInvModal() { document.getElementById('inv-modal').classList.remove('open'); }
-function handleInvOverlayClick(e) { if (e.target === document.getElementById('inv-modal')) closeInvModal(); }
+function openEditRequestModal(id) {
+  const r = allRequests.find(x => x.id === id);
+  if (!r) return;
+  closeModal();
+  document.getElementById('edit-modal-title').textContent = 'Edit — ' + r.id;
+
+  const labelsOptions = ['Interceptor UAV','Target UAV','Lab Materials','Assembly Equipment','Electronics','Mechanical Parts','Software','Office Supplies']
+    .map(l => `<option value="${l}" ${r.label===l?'selected':''}>${l}</option>`).join('');
+
+  const itemsHtml = (r.items || []).map((item, idx) => `
+    <div class="item-row" style="background:#f9f8f5;border-radius:12px;padding:14px;margin-bottom:10px;border:1px solid #e8e6e0" data-idx="${idx}">
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 80px;gap:10px;margin-bottom:10px">
+        <div class="form-group"><label style="font-size:12px">Item Name</label><input type="text" class="edit-item-name" value="${item.name||''}"></div>
+        <div class="form-group"><label style="font-size:12px">PN</label><input type="text" class="edit-item-pn" value="${item.pn||''}"></div>
+        <div class="form-group"><label style="font-size:12px">Manufacturer PN</label><input type="text" class="edit-item-mfr-pn" value="${item.mfrPn||''}"></div>
+        <div class="form-group"><label style="font-size:12px">Qty</label><input type="number" min="1" class="edit-item-qty" value="${item.qty||1}"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:120px 90px 1fr 1fr 1fr 36px;gap:10px;align-items:end">
+        <div class="form-group"><label style="font-size:12px">Unit Price</label><input type="number" min="0" step="0.01" class="edit-item-price" value="${item.price||''}"></div>
+        <div class="form-group"><label style="font-size:12px">Currency</label>
+          <select class="edit-item-currency" style="border:1px solid #d4d0c8;border-radius:9px;padding:9px 8px;font-size:14px;background:#fff;font-family:'Inter',sans-serif;width:100%">
+            <option ${item.currency==='$'?'selected':''}>$</option>
+            <option ${item.currency==='€'?'selected':''}>€</option>
+            <option ${item.currency==='£'?'selected':''}>£</option>
+            <option ${item.currency==='₪'?'selected':''}>₪</option>
+            <option ${item.currency==='¥'?'selected':''}>¥</option>
+          </select>
+        </div>
+        <div class="form-group"><label style="font-size:12px">Info</label><input type="text" class="edit-item-tech" value="${item.tech||''}"></div>
+        <div class="form-group"><label style="font-size:12px">Link</label><input type="text" class="edit-item-link" value="${item.link||''}"></div>
+        <div class="form-group"><label style="font-size:12px">Vendor</label><input type="text" class="edit-item-vendor" value="${item.vendor||''}"></div>
+        <button class="btn btn-sm btn-danger" onclick="removeEditItem(this)" style="margin-bottom:2px">✕</button>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('edit-modal-content').innerHTML = `
+    <div class="form-row">
+      <div class="form-group">
+        <label>Requester Name</label>
+        <input type="text" id="edit-requester" value="${r.requester||''}">
+      </div>
+      <div class="form-group">
+        <label>Label</label>
+        <select id="edit-label">
+          <option value="">No label</option>
+          ${labelsOptions}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Procurement Channel</label>
+        <select id="edit-channel">
+          <option value="" ${!r.channel?'selected':''}>Not set</option>
+          <option value="Purchase Order" ${r.channel==='Purchase Order'?'selected':''}>Purchase Order</option>
+          <option value="Credit Card" ${r.channel==='Credit Card'?'selected':''}>Credit Card</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;margin-top:28px">
+          <input type="checkbox" id="edit-payment10" ${r.payment_10th?'checked':''} style="width:16px;height:16px">
+          Payment on 10th
+        </label>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label>Request Details</label>
+      <textarea id="edit-justification" style="min-height:80px">${r.justification||''}</textarea>
+    </div>
+    <div class="card-title" style="margin-bottom:10px">Items</div>
+    <div id="edit-items-container">${itemsHtml}</div>
+    <button class="btn btn-sm" onclick="addEditItem()" style="margin-bottom:16px">+ Add Item</button>
+    <div class="form-actions">
+      <button class="btn" onclick="closeEditModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditedRequest('${id}')">💾 Save Changes</button>
+    </div>`;
+
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function removeEditItem(btn) {
+  const rows = document.querySelectorAll('#edit-items-container .item-row');
+  if (rows.length > 1) btn.closest('.item-row').remove();
+}
+
+function addEditItem() {
+  const container = document.getElementById('edit-items-container');
+  const div = document.createElement('div');
+  div.className = 'item-row';
+  div.style.cssText = 'background:#f9f8f5;border-radius:12px;padding:14px;margin-bottom:10px;border:1px solid #e8e6e0';
+  div.innerHTML = `
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr 80px;gap:10px;margin-bottom:10px">
+      <div class="form-group"><label style="font-size:12px">Item Name</label><input type="text" class="edit-item-name" placeholder="Item name"></div>
+      <div class="form-group"><label style="font-size:12px">PN</label><input type="text" class="edit-item-pn" placeholder="Optional"></div>
+      <div class="form-group"><label style="font-size:12px">Manufacturer PN</label><input type="text" class="edit-item-mfr-pn" placeholder="Mfr PN"></div>
+      <div class="form-group"><label style="font-size:12px">Qty</label><input type="number" min="1" value="1" class="edit-item-qty"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:120px 90px 1fr 1fr 1fr 36px;gap:10px;align-items:end">
+      <div class="form-group"><label style="font-size:12px">Unit Price</label><input type="number" min="0" step="0.01" placeholder="0.00" class="edit-item-price"></div>
+      <div class="form-group"><label style="font-size:12px">Currency</label><select class="edit-item-currency" style="border:1px solid #d4d0c8;border-radius:9px;padding:9px 8px;font-size:14px;background:#fff;font-family:'Inter',sans-serif;width:100%"><option>$</option><option>€</option><option>£</option><option>₪</option><option>¥</option></select></div>
+      <div class="form-group"><label style="font-size:12px">Info</label><input type="text" placeholder="Info..." class="edit-item-tech"></div>
+      <div class="form-group"><label style="font-size:12px">Link</label><input type="text" placeholder="https://..." class="edit-item-link"></div>
+      <div class="form-group"><label style="font-size:12px">Vendor</label><input type="text" placeholder="Optional" class="edit-item-vendor"></div>
+      <button class="btn btn-sm btn-danger" onclick="removeEditItem(this)" style="margin-bottom:2px">✕</button>
+    </div>`;
+  container.appendChild(div);
+}
+
+async function saveEditedRequest(id) {
+  const requester = document.getElementById('edit-requester').value.trim();
+  if (!requester) { showToast('Please enter requester name'); return; }
+
+  const items = [];
+  document.querySelectorAll('#edit-items-container .item-row').forEach(row => {
+    const name = row.querySelector('.edit-item-name').value.trim();
+    const qty = parseFloat(row.querySelector('.edit-item-qty').value) || 0;
+    if (!name) return;
+    items.push({
+      name, qty,
+      pn:       row.querySelector('.edit-item-pn').value.trim(),
+      mfrPn:    row.querySelector('.edit-item-mfr-pn').value.trim(),
+      price:    row.querySelector('.edit-item-price').value.trim(),
+      currency: row.querySelector('.edit-item-currency').value,
+      tech:     row.querySelector('.edit-item-tech').value.trim(),
+      link:     row.querySelector('.edit-item-link').value.trim(),
+      vendor:   row.querySelector('.edit-item-vendor').value.trim()
+    });
+  });
+
+  if (!items.length) { showToast('Please add at least one item'); return; }
+
+  const r = allRequests.find(x => x.id === id);
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-GB') + ' ' + now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const historyEntry = { date: dateStr, user: currentName || 'User', status: r.status, note: 'Request edited' };
+  const newHistory = [...(r.history || []), historyEntry];
+
+  const updates = {
+    requester,
+    items,
+    label:        document.getElementById('edit-label').value || null,
+    channel:      document.getElementById('edit-channel').value || null,
+    justification:document.getElementById('edit-justification').value.trim(),
+    payment_10th: document.getElementById('edit-payment10').checked,
+    history:      newHistory
+  };
+
+  const { error } = await db.from('requests').update(updates).eq('id', id);
+  if (error) { showToast('Error saving changes'); console.error(error); return; }
+  showToast('Request updated successfully');
+  closeEditModal();
+  await loadRequests();
+  openModal(id);
+}
+
+function closeEditModal() { document.getElementById('edit-modal').classList.remove('open'); }
+function handleEditOverlayClick(e) { if (e.target === document.getElementById('edit-modal')) closeEditModal(); }
 
 // Auto-add to inventory when request marked as Received
 async function checkSimilarInventoryItems(newItem, inventoryList) {
